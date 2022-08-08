@@ -127,7 +127,7 @@ type BoardData struct {
 //containing values from 0 to 2 (0 = empty, 1 = black, 2 = white). Board is indexed as Board[y][x].
 type BoardState struct {
 	MoveNumber   int     `json:"move_number"`
-	PlayerToMove int     `json:"player_to_move"`
+	PlayerToMove int64   `json:"player_to_move"`
 	Phase        string  `json:"phase"`
 	Board        [][]int `json:"board"`
 	Outcome      string  `json:"outcome"`

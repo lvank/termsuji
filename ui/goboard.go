@@ -2,6 +2,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/lvank/termsuji/api"
 	"github.com/lvank/termsuji/config"
@@ -9,13 +11,15 @@ import (
 )
 
 type GoBoardUI struct {
-	Box        *tview.Box
-	BoardState *api.BoardState
-	selX       int
-	selY       int
-	app        *tview.Application
-	rc         *api.RealtimeClient
-	styles     []tcell.Color
+	Box          *tview.Box
+	BoardState   *api.BoardState
+	hint         *tview.TextView
+	selX         int
+	selY         int
+	lastTurnPass bool
+	app          *tview.Application
+	rc           *api.RealtimeClient
+	styles       []tcell.Color
 }
 
 func (g *GoBoardUI) SelectedTile() *api.BoardPos {
@@ -52,10 +56,11 @@ func (g *GoBoardUI) ResetSelection() {
 	g.selY = -1
 }
 
-func NewGoBoard(app *tview.Application, c *config.Config) *GoBoardUI {
+func NewGoBoard(app *tview.Application, c *config.Config, hint *tview.TextView) *GoBoardUI {
 	goBoard := &GoBoardUI{
 		Box:        tview.NewBox(),
 		BoardState: &api.BoardState{},
+		hint:       hint,
 		app:        app,
 		selX:       -1,
 		selY:       -1,
@@ -124,9 +129,18 @@ func (g *GoBoardUI) Connect(gameID int64) {
 		panic(err)
 	}
 	g.rc.Authenticate()
-	g.rc.OnMove(func(m interface{}) {
+	g.rc.OnMove(func(m api.OnMoveResult) {
+		//If X/Y are -1, the last turn was a pass.
+		g.lastTurnPass = (m.Move.X == -1 && m.Move.Y == -1)
 		g.refreshBoard()
 		g.app.QueueUpdateDraw(func() {})
+	})
+	g.rc.OnClock(func(c api.OnClockResult) {
+		if c.CurrentPlayerID == api.AuthData.Player.ID {
+			g.setHint("It is your turn.")
+		} else {
+			g.setHint("It is your opponent's turn.")
+		}
 	})
 	g.refreshBoard()
 }
@@ -144,6 +158,19 @@ func (g *GoBoardUI) Close() {
 
 func (g *GoBoardUI) refreshBoard() {
 	g.BoardState = api.GetGameState(g.rc.GameID)
+	if g.BoardState.PlayerToMove == api.AuthData.Player.ID {
+		g.setHint("It is your turn.")
+	} else {
+		g.setHint("It is your opponent's turn.")
+	}
+}
+
+func (g *GoBoardUI) setHint(hint string) {
+	var passHint string
+	if g.lastTurnPass {
+		passHint = "The previous turn was passed.\n\n"
+	}
+	g.hint.SetText(fmt.Sprintf("%s%s\n\narrow keys: move cursor, Return: play move\nBackspace: pass turn, q: quit", passHint, hint))
 }
 
 //Helper function to draw a single cell, which occupies two characters on screen

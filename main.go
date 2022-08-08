@@ -23,7 +23,13 @@ func main() {
 	rootPage.SetBorder(true).SetTitle("termsuji")
 	list := tview.NewList()
 
-	gameBoard := ui.NewGoBoard(app, cfg)
+	gameFrame := tview.NewFlex()
+	gameHint := tview.NewTextView()
+	gameHint.SetBorder(true)
+	gameBoard := ui.NewGoBoard(app, cfg, gameHint)
+	gameFrame.
+		AddItem(gameBoard.Box, 19*2+2, 1, true).
+		AddItem(gameHint, 0, 2, false)
 	gameBoard.Box.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
 			if gameBoard.SelectedTile() != nil {
@@ -49,6 +55,8 @@ func main() {
 				return nil
 			}
 			gameBoard.PlayMove(selTile.X, selTile.Y)
+		case tcell.KeyBackspace:
+			gameBoard.PlayMove(-1, -1)
 		}
 		return event
 	})
@@ -84,7 +92,7 @@ func main() {
 
 	rootPage.AddPage("login", loginFrame, true, true)
 	rootPage.AddPage("browser", list, true, false)
-	rootPage.AddPage("gameview", gameBoard.Box, true, false)
+	rootPage.AddPage("gameview", gameFrame, true, false)
 
 	if api.AuthData.Authenticated {
 		storeAuthData(auth)
