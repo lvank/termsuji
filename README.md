@@ -6,5 +6,5 @@ The *api* package can be used as a starting point to work with the online-go.com
 
 To run, register an Oauth application at https://online-go.com/oauth2/applications/, place the client ID in `api/client_id.txt` without any whitespace, and run/build the application.
 
-![termsuji2](https://user-images.githubusercontent.com/110688516/183292028-31e8d7a9-fe6c-4659-bb80-2833b07f4408.png)
+![termsuji3](https://user-images.githubusercontent.com/110688516/183505721-6e50c05d-2572-4bb0-a06d-eae3006414a3.png)
 ![termsuji1](https://user-images.githubusercontent.com/110688516/183292033-05c1e050-2c4c-40d0-b45c-e524b70b097e.png)
