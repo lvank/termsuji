@@ -55,8 +55,10 @@ func main() {
 				return nil
 			}
 			gameBoard.PlayMove(selTile.X, selTile.Y)
-		case tcell.KeyBackspace:
-			gameBoard.PlayMove(-1, -1)
+		case tcell.KeyRune:
+			if event.Rune() == 'p' {
+				gameBoard.PlayMove(-1, -1)
+			}
 		}
 		return event
 	})

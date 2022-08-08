@@ -138,6 +138,10 @@ type BoardState struct {
 	} `json:"last_move"`
 }
 
+func (b *BoardState) Finished() bool {
+	return b.Phase == "finished"
+}
+
 func (b *BoardState) Height() int {
 	return len(b.Board)
 }
@@ -388,6 +392,10 @@ func SGFInt(r byte) int {
 //The SGF notation has two letters per coordinate, where "aa" is the upper left corner,
 //"ba" is one stone to the right of that, "bc" is two stones below "ba", etc.
 func PosSGF(p BoardPos) string {
+	if p.X == -1 && p.Y == -1 {
+		//Not official, but used by OGS
+		return ".."
+	}
 	//Uppercase letters aren't implemented at the moment, so it's only up to 26x26 boards
 	return fmt.Sprintf("%c%c", rune(rAL+p.X), rune(rAL+p.Y))
 }
