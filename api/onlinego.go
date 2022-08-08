@@ -1,5 +1,7 @@
 //Package api contains methods to interact with the online-go.com REST API and Realtime API.
-//For methods that require authentication, populate api.OauthClientID and call Authenticate first before using the rest of the API.
+//For methods that require authentication, populate api.OauthClientID and call AuthenticatePassword
+//or AuthenticateRefreshToken first before using the rest of the API. If successful, AuthData will contain
+//relevant information about the user and tokens.
 package api
 
 import (
@@ -12,15 +14,17 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/lvank/termsuji/config"
 )
 
 var (
 	//go:embed client_id.txt
-	OauthClientID string
-	BaseURL       = "https://online-go.com"
-	AuthData      *config.AuthData
+	oauthClientIDRaw string //may contain whitespace or other characters; use the exported one instead
+	OauthClientID    = strings.TrimSpace(oauthClientIDRaw)
+	BaseURL          = "https://online-go.com"
+	AuthData         UserInfo
+
+	//errors
+	InvalidRefreshToken = errors.New("Invalid refresh token")
 
 	apiURL                  = fmt.Sprintf("%s/api/v1/", BaseURL)
 	termApiURL              = fmt.Sprintf("%s/termination-api/", BaseURL)
@@ -51,6 +55,24 @@ type OauthResponse struct {
 	ErrorDescription string `json:"error_description"`
 }
 
+func (o *OauthResponse) GetError() string {
+	if o.Error != "" {
+		if o.ErrorDescription != "" {
+			return o.ErrorDescription
+		}
+		//Oauth error with no description is likely misconfiguration
+		panic(o.Error)
+	}
+	return ""
+}
+
+//UserInfo contains info about the logged in user after calling either Authenticate function.
+type UserInfo struct {
+	Authenticated bool
+	Player        Player
+	Oauth         OauthResponse
+}
+
 //Player information
 type Player struct {
 	ID         int64   `json:"id"`
@@ -63,10 +85,11 @@ func (p Player) String() string {
 }
 
 func (p Player) Ranking() string {
+	//adds 0.5 to round to nearest integer instead of rounding 1.9 to 1
 	if p.RawRanking < 30 {
-		return fmt.Sprintf("%d kyu", int(30-p.RawRanking))
+		return fmt.Sprintf("%d kyu", int(30-p.RawRanking+0.5))
 	} else {
-		return fmt.Sprintf("%d dan", int((p.RawRanking-30)+1))
+		return fmt.Sprintf("%d dan", int((p.RawRanking-30+0.5)+1))
 	}
 }
 
@@ -208,77 +231,57 @@ func GetGameState(gameID int64) *BoardState {
 	return &board
 }
 
-//GetUsername gets the username of the user, if authenticated, otherwise an empty string.
-func GetUsername() string {
-	return AuthData.Username
-}
-
-//Authenticate attempts to authenticate with OGS, and if successful, returns nil
-//and will store the authentication data of the user for further usage.
-//It will also cache the username, ID and refresh token on disk.
-//If a refresh token is present and successfully exchanged for an auth token, username/password
-//are not used. If the refresh token is invalid, it will be cleared from the cache.
-//Otherwise, password authentication (using the password in OGS > Settings > Account Settings) will be attempted.
-//An unsuccessful authentication attempt will return an error.
-//This method must be called before using any other APIs that require authentication.
-func Authenticate(username, password string) error {
-	AuthData = config.InitAuthData()
-	AuthData.Authenticated = false
+//AuthenticateRefreshToken authenticates with a token from the user.
+//Either this function or
+func AuthenticateRefreshToken(refreshToken string) error {
 	var oauthResponse OauthResponse
 	var apiError *OGSApiError
-	var me Player
-	// We have a refresh token, try to use it
 	var values url.Values = make(url.Values)
 	values.Set("client_id", OauthClientID)
-	if AuthData.Tokens.Refresh != "" {
-		refreshValues := values
-		refreshValues.Set("grant_type", "refresh_token")
-		refreshValues.Set("refresh_token", AuthData.Tokens.Refresh)
-		err := doPostForm(oauthURL, "token/", refreshValues, &oauthResponse) //trailing slash to path is required!
-		if err != nil {
-			if errors.As(err, &apiError) && oauthResponse.Error != "" {
-				//Oauth failure using refresh token, clear refresh token and attempt user/pass auth
-				AuthData.Tokens.Refresh = ""
-				AuthData.Save()
-			} else {
-				return err
-			}
-		} else {
-			AuthData.Authenticated = true
-		}
-	}
-	//No refresh token; use username and application password
-	if !AuthData.Authenticated {
-		if username == "" || password == "" {
-			return errors.New("Username/password required")
-		}
-		values.Set("grant_type", "password")
-		values.Set("username", username)
-		values.Set("password", password)
-		err := doPostForm(oauthURL, "token/", values, &oauthResponse) //trailing slash to path is required!
-		if oauthResponse.Error != "" {
-			return errors.New(oauthResponse.ErrorDescription)
-		} else if err != nil {
-			return err
-		}
-	}
+	values.Set("grant_type", "refresh_token")
+	values.Set("refresh_token", refreshToken)
+	err := doPostForm(oauthURL, "token/", values, &oauthResponse) //trailing slash to path is required!
 
-	//Authentication should have worked
-	AuthData.Tokens.Access = oauthResponse.AccessToken
-	AuthData.Tokens.Refresh = oauthResponse.RefreshToken
+	if errors.As(err, &apiError) && oauthResponse.Error != "" {
+		return InvalidRefreshToken
+	} else if err != nil {
+		return err
+	}
+	AuthData.Oauth = oauthResponse
+	getPlayerForAuth()
+	return nil
+}
+
+func AuthenticatePassword(username, password string) error {
+	var oauthResponse OauthResponse
+	if username == "" || password == "" {
+		return errors.New("Username/password required")
+	}
+	var values url.Values = make(url.Values)
+	values.Set("client_id", OauthClientID)
+	values.Set("grant_type", "password")
+	values.Set("username", username)
+	values.Set("password", password)
+	err := doPostForm(oauthURL, "token/", values, &oauthResponse) //trailing slash to path is required!
+	if oauthResponse.Error != "" {
+		return errors.New(oauthResponse.GetError()) //may panic, depending on error
+	} else if err != nil {
+		return err
+	}
+	AuthData.Oauth = oauthResponse
+	getPlayerForAuth()
+	return nil
+}
+
+func getPlayerForAuth() {
+	var me Player
 	err := doGet(apiURL, "me", nil, &me)
 	if err != nil {
 		panic(err)
 	}
-	if oauthResponse.Error != "" {
-		return errors.New(oauthResponse.ErrorDescription)
-	}
-
-	AuthData.UserID = me.ID
-	AuthData.Username = me.Username
+	//if the call succeeds, user must be authenticated
+	AuthData.Player = me
 	AuthData.Authenticated = true
-	AuthData.Save()
-	return nil
 }
 
 type OGSConfig struct {
@@ -325,8 +328,8 @@ func handleRequest(httpMethod string, apiURL, apiPath, jsonstr string, postValue
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		}
 	}
-	if AuthData.Tokens.Access != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", AuthData.Tokens.Access))
+	if AuthData.Oauth.AccessToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", AuthData.Oauth.AccessToken))
 	}
 	resp, err := client.Do(req)
 	if err != nil {

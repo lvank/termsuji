@@ -12,7 +12,10 @@ import (
 )
 
 func main() {
-	api.Authenticate("", "") //attempt refresh token auth
+	auth := config.InitAuthData()
+	if auth.Tokens.Refresh != "" {
+		api.AuthenticateRefreshToken(auth.Tokens.Refresh)
+	}
 	cfg := config.InitConfig()
 	cfg.Save() // TODO settings screen or something
 	app := tview.NewApplication()
@@ -60,10 +63,10 @@ func main() {
 	loginForm := tview.NewForm()
 	loginFrame := tview.NewFrame(loginForm)
 	loginForm.
-		AddInputField("Username", api.AuthData.Username, 32, nil, nil).
+		AddInputField("Username", auth.Username, 32, nil, nil). //if we have a cached username, prefill it
 		AddPasswordField("Password", "", 32, '*', nil).
 		AddButton("Submit", func() {
-			err := api.Authenticate(
+			err := api.AuthenticatePassword(
 				loginForm.GetFormItem(0).(*tview.InputField).GetText(),
 				loginForm.GetFormItem(1).(*tview.InputField).GetText(),
 			)
@@ -71,6 +74,7 @@ func main() {
 				loginFrame.Clear().AddText(err.Error(), true, tview.AlignLeft, tcell.PaletteColor(1))
 				return
 			}
+			storeAuthData(auth)
 			refreshGames(rootPage, list, gameBoard)
 			rootPage.SwitchToPage("browser")
 		})
@@ -83,6 +87,7 @@ func main() {
 	rootPage.AddPage("gameview", gameBoard.Box, true, false)
 
 	if api.AuthData.Authenticated {
+		storeAuthData(auth)
 		refreshGames(rootPage, list, gameBoard)
 		rootPage.SwitchToPage("browser")
 	} else {
@@ -111,16 +116,10 @@ func refreshGames(root *tview.Pages, list *tview.List, gui *ui.GoBoardUI) {
 	}
 }
 
-func mockBoard() *api.BoardData {
-	return &api.BoardData{
-		Width:         19,
-		Height:        19,
-		InitialPlayer: "black",
-		Moves: []api.BoardPos{
-			{X: 0, Y: 0},
-			{X: 0, Y: 18},
-			{X: 18, Y: 0},
-			{X: 18, Y: 18},
-		},
-	}
+//Stores authentication data from api package after successful authentication.
+func storeAuthData(a *config.AuthData) {
+	a.Username = api.AuthData.Player.Username
+	a.UserID = api.AuthData.Player.ID
+	a.Tokens.Refresh = api.AuthData.Oauth.RefreshToken
+	a.Save()
 }

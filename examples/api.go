@@ -8,12 +8,14 @@ import (
 
 // an example
 func APIExample() {
-	//Set a password from OGS > Settings > Account Settings
-	if err := api.Authenticate("YourOGSUsername", "YourOGSPassword"); err != nil {
-		//If a refresh token exists, the username and password are unused
-		panic("Username and password incorrect")
+	//You can only authenticate with a refresh token if you have one stored from an earlier password authentication.
+	if err := api.AuthenticateRefreshToken("YourStoredRefreshToken"); err != nil {
+		//Set a password from OGS > Settings > Account Settings
+		if err = api.AuthenticatePassword("YourOGSUsername", "YourOGSPassword"); err != nil {
+			panic("Username and password incorrect")
+		}
 	}
-	fmt.Printf("Hello, %s!", api.AuthData.Username)
+	fmt.Printf("Hello, %s!", api.AuthData.Player.Username)
 	fmt.Println("Active games:")
 	games := api.GetGamesList()
 	var game api.GameListData //store the last active game

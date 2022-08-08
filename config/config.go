@@ -53,10 +53,8 @@ type AuthData struct {
 	Username string `json:"username"`
 	UserID   int64  `json:"id"`
 	Tokens   struct {
-		Access  string `json:"-"` //ephemeral, not saved
 		Refresh string `json:"refresh"`
 	} `json:"tokens"`
-	Authenticated bool `json:"-"`
 }
 
 func InitAuthData() *AuthData {

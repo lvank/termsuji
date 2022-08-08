@@ -102,7 +102,7 @@ func NewGoBoard(app *tview.Application, c *config.Config) *GoBoardUI {
 				}
 				drawRune := ' '
 				if boardX == goBoard.BoardState.LastMove.X && boardY == goBoard.BoardState.LastMove.Y {
-					drawRune = '░'
+					drawRune = '/'
 				}
 				if boardX == goBoard.selX && boardY == goBoard.selY {
 					drawRune = 'X'

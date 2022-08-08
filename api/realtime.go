@@ -50,7 +50,7 @@ func Connect(gameID int64, f interface{}) (*RealtimeClient, error) {
 	}
 	c.Emit("game/connect", &EmitGameConnect{
 		GameID:   r.GameID,
-		PlayerID: AuthData.UserID,
+		PlayerID: AuthData.Player.ID,
 		Chat:     false,
 	})
 	r.c = c
@@ -69,15 +69,15 @@ func (r *RealtimeClient) Authenticate() {
 	auth := GetOGSConfig().ChatAuth
 	r.c.Emit("authenticate", &EmitAuth{
 		Auth:     auth,
-		Username: AuthData.Username,
-		PlayerID: AuthData.UserID,
+		Username: AuthData.Player.Username,
+		PlayerID: AuthData.Player.ID,
 	})
 }
 
 func (r *RealtimeClient) Move(x, y int) {
 	r.c.Emit("game/move", &EmitMove{
 		GameID:   r.GameID,
-		PlayerID: AuthData.UserID,
+		PlayerID: AuthData.Player.ID,
 		Move:     PosSGF(BoardPos{X: x, Y: y}),
 	})
 }
