@@ -40,7 +40,7 @@ type EmitMove struct {
 //An optional function f may be provided that will get called whenever the "game/<id>/gamedata"
 //event is received, which happens directly after connecting and during the stone removal/finished phases.
 //You are responsible for calling Disconnect() when the RealtimeClient is no longer required.
-func Connect(gameID int64, f func(interface{})) (*RealtimeClient, error) {
+func Connect(gameID int64, f func(map[string]interface{})) (*RealtimeClient, error) {
 	var r *RealtimeClient = &RealtimeClient{GameID: gameID}
 	c, err := gosocketio.Dial(wsUrl, transport.GetDefaultWebsocketTransport())
 	if err != nil {

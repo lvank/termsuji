@@ -14,6 +14,7 @@ type GoBoardUI struct {
 	Box          *tview.Box
 	BoardState   *api.BoardState
 	hint         *tview.TextView
+	finished     bool //BoardState may lag behind a bit; realtime API state is more accurate
 	selX         int
 	selY         int
 	lastTurnPass bool
@@ -127,8 +128,14 @@ func NewGoBoard(app *tview.Application, c *config.Config, hint *tview.TextView) 
 }
 
 func (g *GoBoardUI) Connect(gameID int64) {
-	realtimeClient, err := api.Connect(gameID, func(i interface{}) {
-		g.refreshHint()
+	g.finished = false
+	realtimeClient, err := api.Connect(gameID, func(i map[string]interface{}) {
+		if i["phase"] == "finished" {
+			g.finished = true
+			g.ResetSelection()
+		}
+		g.refreshBoard()
+		g.app.QueueUpdateDraw(func() {})
 	})
 	g.rc = realtimeClient
 	if err != nil {
@@ -138,7 +145,9 @@ func (g *GoBoardUI) Connect(gameID int64) {
 	g.rc.OnMove(func(m api.OnMoveResult) {
 		//If X/Y are -1, the last turn was a pass.
 		g.lastTurnPass = (m.Move.X == -1 && m.Move.Y == -1)
-		g.refreshBoard()
+		if !g.lastTurnPass {
+			g.refreshBoard()
+		}
 		g.app.QueueUpdateDraw(func() {})
 	})
 	g.rc.OnClock(func(c api.OnClockResult) {
@@ -168,7 +177,7 @@ func (g *GoBoardUI) refreshBoard() {
 
 func (g *GoBoardUI) refreshHint() {
 	var passHint, turnHint string
-	if g.BoardState.Finished() {
+	if g.finished {
 		turnHint = fmt.Sprintf("The game is over.\nOutcome: %s", g.BoardState.Outcome)
 	} else {
 		if g.lastTurnPass {

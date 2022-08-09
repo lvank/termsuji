@@ -4,12 +4,24 @@
 package main
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/lvank/termsuji/api"
 	"github.com/lvank/termsuji/config"
 	"github.com/lvank/termsuji/ui"
 	"github.com/rivo/tview"
 )
+
+var lastRefresh time.Time = time.Now()
+var app *tview.Application
+var rootPage *tview.Pages
+var gameListFrame *tview.Frame
+var gameList *tview.List
+var frameHint *tview.Frame
+var gameBoard *ui.GoBoardUI
+var setLoading func(bool)
 
 func main() {
 	auth := config.InitAuthData()
@@ -18,15 +30,26 @@ func main() {
 	}
 	cfg := config.InitConfig()
 	cfg.Save() // TODO settings screen or something
-	app := tview.NewApplication()
-	rootPage := tview.NewPages()
+	app = tview.NewApplication()
+	rootPage = tview.NewPages()
 	rootPage.SetBorder(true).SetTitle("termsuji")
-	list := tview.NewList()
+	gameList = tview.NewList()
+	gameListFrame = tview.NewFrame(gameList)
+	gameListFrame.SetBorders(0, 0, 0, 0, 0, 0)
 
+	loadingModal := tview.NewModal()
+	loadingModal.SetText("Loading...")
+	setLoading = func(loading bool) {
+		f := rootPage.ShowPage
+		if !loading {
+			f = rootPage.HidePage
+		}
+		f("loading")
+	}
 	gameFrame := tview.NewFlex()
 	gameHint := tview.NewTextView()
 	gameHint.SetBorder(true)
-	gameBoard := ui.NewGoBoard(app, cfg, gameHint)
+	gameBoard = ui.NewGoBoard(app, cfg, gameHint)
 	gameFrame.
 		AddItem(gameBoard.Box, 19*2+2, 1, true).
 		AddItem(gameHint, 0, 2, false)
@@ -36,7 +59,10 @@ func main() {
 				gameBoard.ResetSelection()
 			} else {
 				gameBoard.Close()
-				rootPage.SwitchToPage("browser")
+				async(func() {
+					refreshGames()
+					rootPage.SwitchToPage("browser")
+				})
 			}
 			return nil
 		}
@@ -62,10 +88,19 @@ func main() {
 		}
 		return event
 	})
-	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
-			app.Stop()
-			return nil
+	gameList.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case 'q':
+				app.Stop()
+				return nil
+			case 'r':
+				async(func() {
+					refreshGames()
+				})
+				return nil
+			}
 		}
 		return event
 	})
@@ -85,7 +120,7 @@ func main() {
 				return
 			}
 			storeAuthData(auth)
-			refreshGames(rootPage, list, gameBoard)
+			refreshGames()
 			rootPage.SwitchToPage("browser")
 		})
 	loginFrame.
@@ -93,12 +128,13 @@ func main() {
 		AddText("Log in to OGS", true, tview.AlignLeft, tcell.PaletteColor(3))
 
 	rootPage.AddPage("login", loginFrame, true, true)
-	rootPage.AddPage("browser", list, true, false)
+	rootPage.AddPage("browser", gameListFrame, true, false)
 	rootPage.AddPage("gameview", gameFrame, true, false)
+	rootPage.AddPage("loading", loadingModal, false, false)
 
 	if api.AuthData.Authenticated {
 		storeAuthData(auth)
-		refreshGames(rootPage, list, gameBoard)
+		refreshGames()
 		rootPage.SwitchToPage("browser")
 	} else {
 		rootPage.SwitchToPage("login")
@@ -109,21 +145,39 @@ func main() {
 	}
 }
 
-func refreshGames(root *tview.Pages, list *tview.List, gui *ui.GoBoardUI) {
-	list.Clear()
-	gamelist := api.GetGamesList()
-	i := 0
-	for _, game := range gamelist.Games {
-		if game.GameOver() {
-			continue
+func refreshGames() {
+	gameList.Clear()
+	async(func() {
+		lastRefresh = time.Now()
+		gamesArray := api.GetGamesList()
+		i := 0
+		for _, game := range gamesArray.Games {
+			if game.GameOver() {
+				continue
+			}
+			gameID := game.ID
+			gameList.AddItem(game.Name, game.Description(), rune('a'+i), func() {
+				async(func() {
+					gameBoard.Connect(gameID)
+					rootPage.SwitchToPage("gameview")
+				})
+			})
+			i++
 		}
-		gameID := game.ID
-		list.AddItem(game.Name, game.Description(), rune('a'+i), func() {
-			gui.Connect(gameID)
-			root.SwitchToPage("gameview")
-		})
-		i++
-	}
+		gameListHint := fmt.Sprintf("r: refresh, q: quit. Last refresh: %s", time.Now().Format("15:04:05"))
+		gameListFrame.Clear().AddText(gameListHint, false, tview.AlignLeft, tcell.ColorDefault)
+	})
+}
+
+//Helper function to show a loading screen while blocking functions are being called.
+func async(f func()) {
+	go func() {
+		setLoading(true)
+		app.Draw()
+		f()
+		setLoading(false)
+		app.Draw()
+	}()
 }
 
 //Stores authentication data from api package after successful authentication.
