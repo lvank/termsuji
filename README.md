@@ -4,16 +4,19 @@ termsuji is an application to play Go in your terminal. It is limited in feature
 
 The *api* package can be used as a starting point to work with the online-go.com REST and realtime APIs. It only exports a limited part of the API and it may change without notice.
 
-If you want to build yourself (or if your architecture isn't listed), [download/install Go 1.18 or higher](https://go.dev/dl), download and extract the source code, register an Oauth application at https://online-go.com/oauth2/applications/ (this requires an online-go.com account), set the client type to "Public" and the grant type to "resource owner password based", place the client ID in `api/client_id.txt` without any whitespace, and run/build the application with `go run .` or `go build .` in the source code directory
+If you want to build yourself (or if your architecture isn't listed), [download/install Go 1.18 or higher](https://go.dev/dl), download and extract the source code, register an Oauth application at https://online-go.com/oauth2/applications/ (this requires an online-go.com account), set the client type to "Public" and the grant type to "resource owner password based", place the client ID in `api/client_id.txt` without any whitespace, and run/build the application with `go run .` or `go build .` in the source code directory.
 
-![termsuji3](https://user-images.githubusercontent.com/110688516/183505721-6e50c05d-2572-4bb0-a06d-eae3006414a3.png)
-![termsuji4](https://user-images.githubusercontent.com/110688516/183740301-19c66b74-d0ba-4fc2-a380-c9a3c08632e1.png)
+![termsuji_lobby](https://user-images.githubusercontent.com/110688516/184015051-e9444974-e7e4-4842-9072-e97e810f2d5b.png)
+![termsuji_game](https://user-images.githubusercontent.com/110688516/184015075-afa1bb8b-cdff-4e53-ba89-45be2353d2ed.png)
+![termsuji_unicode](https://user-images.githubusercontent.com/110688516/184015096-a47c3439-0809-43ea-a89e-61a572c7c9f1.png)
 
 ## Configuration
 
 There's a themes option in-application with some preset themes, but you can get more detailed configuration by editing the configuration file.
 The application stores a configuration file in $XDG_CONFIG_HOME/termsuji/config.json (or C:/Users/YourUsername/AppData/Roaming/termsuji/config.json on Windows) with the following configurable values.
+
 To find out "Unicode code points", you can visit https://unicode-table.com/, look up a symbol you want to use and copy the number from "HTML code" (or for the technically inclined, convert the Unicode number from hex to int).
+
 To find out colour numbers, refer to the bottom left numbers on https://upload.wikimedia.org/wikipedia/commons/1/15/Xterm_256color_chart.svg
 To reset your default settings, just delete the configuration file and it'll be regenerated with the defaults.
 
