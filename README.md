@@ -6,7 +6,6 @@ The *api* package can be used as a starting point to work with the online-go.com
 
 If you want to build yourself (or if your architecture isn't listed), [download/install Go 1.18 or higher](https://go.dev/dl), download and extract the source code, register an Oauth application at https://online-go.com/oauth2/applications/ (this requires an online-go.com account), set the client type to "Public" and the grant type to "resource owner password based", place the client ID in `api/client_id.txt` without any whitespace, and run/build the application with `go run .` or `go build .` in the source code directory.
 
-![termsuji_lobby](https://user-images.githubusercontent.com/110688516/184015051-e9444974-e7e4-4842-9072-e97e810f2d5b.png)
 ![termsuji_game](https://user-images.githubusercontent.com/110688516/184015075-afa1bb8b-cdff-4e53-ba89-45be2353d2ed.png)
 ![termsuji_unicode](https://user-images.githubusercontent.com/110688516/184015096-a47c3439-0809-43ea-a89e-61a572c7c9f1.png)
 
