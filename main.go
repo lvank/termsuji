@@ -28,7 +28,10 @@ func main() {
 	if auth.Tokens.Refresh != "" {
 		api.AuthenticateRefreshToken(auth.Tokens.Refresh)
 	}
-	cfg := config.InitConfig()
+	cfg, err := config.InitConfig()
+	if err != nil {
+		panic(err)
+	}
 	cfg.Save() // TODO settings screen or something
 	app = tview.NewApplication()
 	rootPage = tview.NewPages()
@@ -51,7 +54,7 @@ func main() {
 	gameHint.SetBorder(true)
 	gameBoard = ui.NewGoBoard(app, cfg, gameHint)
 	gameFrame.
-		AddItem(gameBoard.Box, 19*2+2, 1, true).
+		AddItem(gameBoard.Box, 20*2+3, 1, true).
 		AddItem(gameHint, 0, 2, false)
 	gameBoard.Box.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyRune && event.Rune() == 'q' {
@@ -82,8 +85,11 @@ func main() {
 			}
 			gameBoard.PlayMove(selTile.X, selTile.Y)
 		case tcell.KeyRune:
-			if event.Rune() == 'p' {
+			switch event.Rune() {
+			case 'p':
 				gameBoard.PlayMove(-1, -1)
+			case 't':
+				rootPage.ShowPage("themes")
 			}
 		}
 		return event
@@ -99,6 +105,9 @@ func main() {
 				async(func() {
 					refreshGames()
 				})
+				return nil
+			case 't':
+				rootPage.ShowPage("themes")
 				return nil
 			}
 		}
@@ -127,9 +136,44 @@ func main() {
 		SetBorders(0, 0, 0, 0, 1, 0).
 		AddText("Log in to OGS", true, tview.AlignLeft, tcell.PaletteColor(3))
 
+	themeList := tview.NewList()
+	themeList.SetTitle("Choose a theme")
+	selectTheme := func(i int, main, secondary string, shortcut rune) {
+		var theme config.Theme
+		switch main {
+		case "default":
+			theme = config.DefaultTheme
+		case "vaporwave":
+			theme = config.VaporwaveTheme
+		case "unicode":
+			theme = config.UnicodeTheme
+		case "catdog":
+			theme = config.CatdogTheme
+		case "hongoku":
+			theme = config.HongokuTheme
+		default: //No action
+		}
+
+		if main != "quit" {
+			cfg.Theme = theme
+			cfg.Save()
+			gameBoard.SetConfig(cfg)
+		}
+		rootPage.HidePage("themes")
+	}
+	themeList.
+		AddItem("default", "The default board theme", '1', nil).
+		AddItem("vaporwave", "Magenta/cyan board theme", '2', nil).
+		AddItem("unicode", "Display board with Unicode emoji symbols", '3', nil).
+		AddItem("catdog", "Board becomes zoo", '4', nil).
+		AddItem("hongoku", "Board becomes unreadable", '5', nil).
+		AddItem("quit", "Keep your current settings", 'q', nil).
+		SetSelectedFunc(selectTheme)
+
 	rootPage.AddPage("login", loginFrame, true, true)
 	rootPage.AddPage("browser", gameListFrame, true, false)
 	rootPage.AddPage("gameview", gameFrame, true, false)
+	rootPage.AddPage("themes", themeList, true, false)
 	rootPage.AddPage("loading", loadingModal, false, false)
 
 	if api.AuthData.Authenticated {
@@ -156,7 +200,7 @@ func refreshGames() {
 				continue
 			}
 			gameID := game.ID
-			gameList.AddItem(game.Name, game.Description(), rune('a'+i), func() {
+			gameList.AddItem(game.Name, game.Description(), rune('1'+i), func() {
 				async(func() {
 					gameBoard.Connect(gameID)
 					rootPage.SwitchToPage("gameview")
@@ -164,7 +208,7 @@ func refreshGames() {
 			})
 			i++
 		}
-		gameListHint := fmt.Sprintf("r: refresh, q: quit. Last refresh: %s", time.Now().Format("15:04:05"))
+		gameListHint := fmt.Sprintf("r: refresh, t: themes, q: quit")
 		gameListFrame.Clear().AddText(gameListHint, false, tview.AlignLeft, tcell.ColorDefault)
 	})
 }
